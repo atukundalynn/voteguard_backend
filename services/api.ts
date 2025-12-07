@@ -275,3 +275,76 @@ export const api = {
     
     return { success: true, token, voter: { ...voter, status: VoterStatus.VERIFIED, token } };
   },
+
+  
+  // --- Data Access ---
+  getPositions: async () => {
+    await ensureAuth();
+    const snapshot = await getDocs(collection(db, COLL.POSITIONS));
+    return snapshot.docs.map(d => {
+      const data = d.data();
+      return { 
+        id: d.id, 
+        ...data,
+        // Ensure required fields exist even if DB data is legacy
+        semester: data.semester || 'Trinity',
+        eligibilityRules: data.eligibilityRules || ''
+      } as Position;
+    });
+  },
+
+  createPosition: async (position: Omit<Position, 'id'>) => {
+    await ensureAuth();
+    const newRef = doc(collection(db, COLL.POSITIONS));
+    const newPos = { 
+        ...position, 
+        id: newRef.id,
+        createdAt: new Date().toISOString()
+    };
+    await setDoc(newRef, newPos);
+    
+    logAction(UserRole.ADMIN, 'Admin', 'CREATE_POSITION', `Created position: ${position.name}`);
+    return newPos;
+  },
+
+  updatePositionStatus: async (id: string, action: 'OPEN' | 'CLOSE') => {
+    await ensureAuth();
+    const ref = doc(db, COLL.POSITIONS, id);
+    const now = new Date();
+    if (action === 'CLOSE') {
+      await updateDoc(ref, { closesAt: new Date(now.getTime() - 1000).toISOString() });
+    } else {
+      await updateDoc(ref, { 
+        opensAt: now.toISOString(),
+        closesAt: new Date(now.getTime() + 86400000 * 7).toISOString()
+      });
+    }
+    logAction(UserRole.ADMIN, 'Admin', 'UPDATE_POSITION', `Changed status of ${id} to ${action}`);
+  },
+
+  updatePositionDetails: async (id: string, updates: any) => {
+    await ensureAuth();
+    const ref = doc(db, COLL.POSITIONS, id);
+    
+    // Sanitize updates to remove undefined keys which crash Firestore
+    const safeUpdates = Object.keys(updates).reduce((acc: any, key) => {
+        if (updates[key] !== undefined) {
+            acc[key] = updates[key];
+        }
+        return acc;
+    }, {});
+
+    await updateDoc(ref, safeUpdates);
+    logAction(UserRole.ADMIN, 'Admin', 'UPDATE_POSITION_DETAILS', `Updated details for position ${id}`);
+  },
+
+  // --- Candidate Management ---
+  getCandidates: async (positionId?: string) => {
+    await ensureAuth();
+    let q = query(collection(db, COLL.CANDIDATES));
+    if (positionId) {
+      q = query(collection(db, COLL.CANDIDATES), where('positionId', '==', positionId));
+    }
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Candidate));
+  },
