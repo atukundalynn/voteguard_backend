@@ -348,3 +348,59 @@ export const api = {
     const snapshot = await getDocs(q);
     return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Candidate));
   },
+
+  
+  uploadPhoto: async (file: File, pathString: string): Promise<string> => {
+    await ensureAuth();
+    try {
+        const storageRef = ref(storage, pathString);
+        await uploadBytes(storageRef, file);
+        const downloadURL = await getDownloadURL(storageRef);
+        return downloadURL;
+    } catch (e) {
+        console.error("Error uploading photo:", e);
+        throw new Error("Failed to upload photo to Firebase Storage");
+    }
+  },
+
+  submitNomination: async (candidate: any) => {
+    await ensureAuth();
+    const newRef = doc(collection(db, COLL.CANDIDATES));
+    const newCand = {
+      ...candidate,
+      id: newRef.id,
+      status: CandidateStatus.SUBMITTED,
+      createdAt: new Date().toISOString()
+    };
+    await setDoc(newRef, newCand);
+    
+    logAction(UserRole.CANDIDATE, candidate.name, 'NOMINATION_SUBMIT', `Applied for position ${candidate.positionId}`);
+    return newCand;
+  },
+
+  updateCandidateStatus: async (id: string, status: CandidateStatus, reason?: string) => {
+    await ensureAuth();
+    const ref = doc(db, COLL.CANDIDATES, id);
+    await updateDoc(ref, { status, reason: reason || null });
+    logAction(UserRole.OFFICER, 'Officer', 'UPDATE_CANDIDATE', `Marked candidate ${id} as ${status}`);
+  },
+
+  // --- Voter Management ---
+  getVoters: async (limitCount: number = 50) => {
+    await ensureAuth();
+    const q = query(collection(db, COLL.VOTERS), orderBy('createdAt', 'desc'), limit(limitCount));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Voter));
+  },
+
+  searchVoters: async (queryStr: string) => {
+    await ensureAuth();
+    if (!queryStr) return [];
+    
+    const q = query(collection(db, COLL.VOTERS), where('regNo', '==', queryStr));
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+        return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Voter));
+    }
+    return [];
+  },
