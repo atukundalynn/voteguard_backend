@@ -197,3 +197,34 @@ export const api = {
         return { success: false, message: `Authentication Error: ${e.message}` };
     }
   },
+
+  
+  requestOtp: async (regNo: string): Promise<{ success: boolean; message: string; otp?: string }> => {
+    await ensureAuth();
+    
+    // Sanitize RegNo for Firestore ID (replace / with _)
+    const safeId = regNo.replace(/\//g, '_');
+
+    const q = query(collection(db, COLL.VOTERS), where('regNo', '==', regNo));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) return { success: false, message: 'Student ID not found in eligibility list.' };
+    
+    const voterDoc = snapshot.docs[0];
+    const voter = voterDoc.data() as Voter;
+
+    if (voter.status === VoterStatus.BLOCKED) return { success: false, message: 'Voter is blocked.' };
+    if (voter.status === VoterStatus.VOTED) return { success: false, message: 'You have already voted.' };
+
+    const pin = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Store OTP in Firestore using safe ID
+    await setDoc(doc(db, COLL.OTPS, safeId), { 
+      pin, 
+      createdAt: new Date().toISOString() 
+    });
+
+    logAction(UserRole.VOTER, regNo, 'OTP_GENERATED', 'In-App PIN generated');
+    
+    return { success: true, message: 'Identity verified.', otp: pin };
+  },
