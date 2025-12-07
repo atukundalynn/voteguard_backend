@@ -79,3 +79,25 @@ const ensureAuth = async () => {
         }
     }
 };
+
+
+// Helper to seed data if empty
+const ensureInitialized = async () => {
+  await ensureAuth();
+
+  try {
+    const posSnap = await getDocs(collection(db, COLL.POSITIONS));
+    if (!posSnap.empty) return;
+
+    console.log('Seeding Database...');
+    const batch = writeBatch(db);
+
+    SEED_POSITIONS.forEach(p => {
+      const ref = doc(db, COLL.POSITIONS, p.id);
+      batch.set(ref, p);
+    });
+
+    SEED_CANDIDATES.forEach(c => {
+      const ref = doc(db, COLL.CANDIDATES, c.id);
+      batch.set(ref, c);
+    });
