@@ -141,3 +141,59 @@ const logAction = async (actorType: UserRole, actorId: string, action: string, d
     console.error('Audit Log Failed', e);
   }
 };
+
+
+export const api = {
+  // --- Auth & Verification ---
+  loginUser: async (email: string, password: string): Promise<{ success: boolean; role?: UserRole; name?: string; message?: string }> => {
+    // 1. Static Credential Validation (Enforce Exam Requirements for Role Assignment)
+    let role: UserRole | undefined;
+    let name: string | undefined;
+
+    if (email === 'admin@elections.ucu.ac.ug' && password === 'admin123') {
+      role = UserRole.ADMIN;
+      name = 'Election Admin';
+    } else if (email === 'officer@elections.ucu.ac.ug' && password === 'officer123') {
+      role = UserRole.OFFICER;
+      name = 'Returning Officer';
+    } else {
+      return { success: false, message: 'Invalid credentials. Please check your email and password.' };
+    }
+
+    // 2. Firebase Authentication (Capture Credential in Cloud)
+    try {
+        // Sign out any anonymous user first
+        if (auth.currentUser) {
+            await signOut(auth);
+        }
+
+        try {
+            // Attempt standard login
+            await signInWithEmailAndPassword(auth, email, password);
+        } catch (loginError: any) {
+            // If user doesn't exist yet (First run), create them
+            if (loginError.code === 'auth/user-not-found' || loginError.code === 'auth/invalid-credential' || loginError.code === 'auth/invalid-login-credentials') {
+                await createUserWithEmailAndPassword(auth, email, password);
+            } else {
+                // Real password error
+                throw loginError;
+            }
+        }
+
+        // 3. Capture User Details in Firestore
+        if (auth.currentUser) {
+            await setDoc(doc(db, COLL.SYSTEM_USERS, auth.currentUser.uid), {
+                uid: auth.currentUser.uid,
+                email,
+                name,
+                role,
+                lastLogin: new Date().toISOString()
+            }, { merge: true });
+        }
+
+        return { success: true, role, name };
+    } catch (e: any) {
+        console.error("Firebase Auth Error:", e);
+        return { success: false, message: `Authentication Error: ${e.message}` };
+    }
+  },
