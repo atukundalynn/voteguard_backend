@@ -404,3 +404,50 @@ export const api = {
     }
     return [];
   },
+
+    addVoter: async (voterData: any) => {
+    await ensureAuth();
+    const q = query(collection(db, COLL.VOTERS), where('regNo', '==', voterData.regNo));
+    const snap = await getDocs(q);
+    if (!snap.empty) throw new Error(`Registration Number ${voterData.regNo} already exists.`);
+
+    const newRef = doc(collection(db, COLL.VOTERS));
+    const newVoter = { 
+        ...voterData, 
+        id: newRef.id,
+        status: VoterStatus.ELIGIBLE,
+        createdAt: new Date().toISOString()
+    };
+    await setDoc(newRef, newVoter);
+    
+    logAction(UserRole.ADMIN, 'Admin', 'ADD_VOTER', `Added voter ${voterData.regNo}`);
+    return newVoter;
+  },
+
+  bulkAddVoters: async (votersData: any[]) => {
+    await ensureAuth();
+    const batch = writeBatch(db);
+    let count = 0;
+    
+    for (const v of votersData) {
+        const ref = doc(collection(db, COLL.VOTERS));
+        batch.set(ref, { 
+            ...v, 
+            id: ref.id, 
+            status: VoterStatus.ELIGIBLE,
+            createdAt: new Date().toISOString()
+        });
+        count++;
+        if (count >= 400) break; // Batch limit safety
+    }
+    await batch.commit();
+    logAction(UserRole.ADMIN, 'Admin', 'BULK_ADD_VOTERS', `Imported ${count} voters`);
+    return { added: count, skipped: 0 };
+  },
+
+  updateVoterStatus: async (id: string, status: VoterStatus) => {
+    await ensureAuth();
+    const ref = doc(db, COLL.VOTERS, id);
+    await updateDoc(ref, { status });
+    logAction(UserRole.ADMIN, 'Admin', 'UPDATE_VOTER_STATUS', `Changed status of ${id} to ${status}`);
+  },
