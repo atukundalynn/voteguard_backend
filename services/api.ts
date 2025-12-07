@@ -228,3 +228,50 @@ export const api = {
     
     return { success: true, message: 'Identity verified.', otp: pin };
   },
+
+  
+  verifyOtp: async (regNo: string, otp: string): Promise<{ success: boolean; token?: string; voter?: Voter; message?: string }> => {
+    await ensureAuth();
+    
+    const safeId = regNo.replace(/\//g, '_');
+    const otpRef = doc(db, COLL.OTPS, safeId);
+    const otpSnap = await getDoc(otpRef);
+    
+    if (!otpSnap.exists()) {
+        return { success: false, message: 'PIN not found or expired. Please request a new one.' };
+    }
+    
+    const storedPin = otpSnap.data().pin;
+    
+    // Strict verification
+    if (storedPin !== otp) {
+        return { success: false, message: 'Invalid Access PIN.' };
+    }
+
+    // Get Voter
+    const q = query(collection(db, COLL.VOTERS), where('regNo', '==', regNo));
+    const vSnap = await getDocs(q);
+    if (vSnap.empty) return { success: false, message: 'Voter not found.' };
+
+    const voterDoc = vSnap.docs[0];
+    const voter = voterDoc.data() as Voter;
+
+    if (voter.status === VoterStatus.VOTED) {
+      return { success: false, message: 'This voter has already cast a ballot.' };
+    }
+
+    const token = Math.random().toString(36).substr(2) + Date.now().toString(36);
+    
+    // Update Voter
+    await updateDoc(voterDoc.ref, {
+      status: VoterStatus.VERIFIED,
+      token: token
+    });
+    
+    // Cleanup OTP
+    await deleteDoc(otpRef);
+
+    logAction(UserRole.VOTER, regNo, 'VERIFIED', 'Voter verified successfully');
+    
+    return { success: true, token, voter: { ...voter, status: VoterStatus.VERIFIED, token } };
+  },
