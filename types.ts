@@ -52,3 +52,28 @@ export interface Voter {
   status: VoterStatus;
   token?: string; // Session token
 }
+
+
+
+export interface Vote {
+  id: string;
+  positionId: string;
+  candidateId: string;
+  castAt: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  actorType: UserRole;
+  actorId: string; // Name or ID
+  action: string;
+  details: string;
+  timestamp: string;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  role: UserRole;
+  token?: string; // For voters
+}
