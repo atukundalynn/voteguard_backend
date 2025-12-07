@@ -30,3 +30,25 @@ export interface Position {
   semester: Semester;
   eligibilityRules: string;
 }
+
+export interface Candidate {
+  id: string;
+  positionId: string;
+  name: string;
+  regNo: string; // Registration Number
+  manifesto: string; // URL or text
+  photoUrl: string;
+  status: CandidateStatus;
+  reason?: string; // For rejection
+  createdAt: string;
+}
+
+export interface Voter {
+  id: string;
+  regNo: string;
+  name: string;
+  email: string;
+  program: string;
+  status: VoterStatus;
+  token?: string; // Session token
+}
