@@ -451,3 +451,52 @@ export const api = {
     await updateDoc(ref, { status });
     logAction(UserRole.ADMIN, 'Admin', 'UPDATE_VOTER_STATUS', `Changed status of ${id} to ${status}`);
   },
+
+    // --- Voting ---
+  castVote: async (token: string, votesToCast: any[]) => {
+    await ensureAuth();
+    // 1. Verify Voter
+    const q = query(collection(db, COLL.VOTERS), where('token', '==', token));
+    const snap = await getDocs(q);
+    
+    if (snap.empty) throw new Error('Invalid or expired ballot token');
+    const voterDoc = snap.docs[0];
+    const voter = voterDoc.data() as Voter;
+
+    if (voter.status === VoterStatus.VOTED) throw new Error('Double voting attempt blocked');
+
+    // 2. Verify Windows
+    const posSnap = await getDocs(collection(db, COLL.POSITIONS));
+    const positions = posSnap.docs.map(d => ({ id: d.id, ...d.data() } as Position));
+    const now = new Date();
+
+    for (const v of votesToCast) {
+      const pos = positions.find(p => p.id === v.positionId);
+      if (pos) {
+        if (now < new Date(pos.opensAt) || now > new Date(pos.closesAt)) {
+          throw new Error(`Voting for ${pos.name} is currently closed.`);
+        }
+      }
+    }
+
+    // 3. Record Votes & Update Voter (Batch)
+    const batch = writeBatch(db);
+    
+    votesToCast.forEach(v => {
+      const voteRef = doc(collection(db, COLL.VOTES));
+      batch.set(voteRef, {
+        positionId: v.positionId,
+        candidateId: v.candidateId,
+        castAt: new Date().toISOString()
+      });
+    });
+
+    batch.update(voterDoc.ref, {
+      status: VoterStatus.VOTED,
+      token: null // Invalidate token
+    });
+
+    await batch.commit();
+    logAction(UserRole.VOTER, 'Anonymous', 'CAST_VOTE', `Voted for ${votesToCast.length} positions`);
+    return { success: true };
+  },
