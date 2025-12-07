@@ -16,3 +16,15 @@ import {
   signOut 
 } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+
+// Collection Names
+const COLL = {
+  POSITIONS: 'positions',
+  CANDIDATES: 'candidates',
+  VOTERS: 'voters',
+  VOTES: 'votes',
+  AUDIT: 'audit_logs',
+  OTPS: 'otps',
+  SYSTEM_USERS: 'system_users'
+};
