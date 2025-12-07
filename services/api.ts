@@ -51,3 +51,31 @@ const SEED_POSITIONS: Position[] = [
     eligibilityRules: 'Open to all 2nd and 3rd-year students. Must have served in a guild committee previously.'
   },
 ];
+
+
+const SEED_CANDIDATES: Candidate[] = [
+  { id: 'c1', positionId: 'p1', name: 'Alice Walker', regNo: 'M23B15/001', manifesto: 'Better campus Wi-Fi for everyone!', photoUrl: 'https://picsum.photos/id/64/200/200', status: CandidateStatus.APPROVED, createdAt: new Date().toISOString() },
+  { id: 'c2', positionId: 'p1', name: 'Bob Smith', regNo: 'S23B12/002', manifesto: 'More library hours.', photoUrl: 'https://picsum.photos/id/65/200/200', status: CandidateStatus.APPROVED, createdAt: new Date().toISOString() },
+  { id: 'c3', positionId: 'p2', name: 'Charlie Brown', regNo: 'J23B15/003', manifesto: 'Transparency in funds.', photoUrl: 'https://picsum.photos/id/66/200/200', status: CandidateStatus.SUBMITTED, createdAt: new Date().toISOString() },
+  { id: 'c4', positionId: 'p2', name: 'Diana Prince', regNo: 'M24B13/004', manifesto: 'Student wellness programs.', photoUrl: 'https://picsum.photos/id/67/200/200', status: CandidateStatus.APPROVED, createdAt: new Date().toISOString() },
+];
+
+const PROGRAMS = ['BSc Computer Science', 'Bachelor of Laws', 'BBA', 'BEd', 'BSc Nursing'];
+
+const generateRegNo = (index: number): string => {
+  const prefixes = ['M24B13', 'S23B12', 'J23B15'];
+  const prefix = prefixes[index % prefixes.length];
+  const number = (index + 1).toString().padStart(3, '0');
+  return `${prefix}/${number}`;
+};
+
+// Helper to ensure authentication before any DB call
+const ensureAuth = async () => {
+    if (!auth.currentUser) {
+        try {
+            await signInAnonymously(auth);
+        } catch (e) {
+            console.error("Auto-auth failed", e);
+        }
+    }
+};
