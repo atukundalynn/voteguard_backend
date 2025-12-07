@@ -123,3 +123,21 @@ const ensureInitialized = async () => {
     console.error("Database initialization failed:", e);
   }
 };
+
+// Initialize on load
+ensureInitialized();
+
+const logAction = async (actorType: UserRole, actorId: string, action: string, details: string) => {
+  try {
+    const entry: Omit<AuditLogEntry, 'id'> = {
+      actorType,
+      actorId,
+      action,
+      details,
+      timestamp: new Date().toISOString()
+    };
+    await addDoc(collection(db, COLL.AUDIT), entry);
+  } catch (e) {
+    console.error('Audit Log Failed', e);
+  }
+};
