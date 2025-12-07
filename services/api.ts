@@ -101,3 +101,25 @@ const ensureInitialized = async () => {
       const ref = doc(db, COLL.CANDIDATES, c.id);
       batch.set(ref, c);
     });
+
+        // Seed 100 voters in batch
+    for (let i = 0; i < 100; i++) {
+      const v = {
+        id: `v${i}`,
+        regNo: generateRegNo(i),
+        name: `Student ${i + 1}`,
+        email: `student${i}@uni.edu`,
+        program: PROGRAMS[i % PROGRAMS.length],
+        status: i < 5 ? VoterStatus.VOTED : VoterStatus.ELIGIBLE,
+        createdAt: new Date().toISOString()
+      };
+      const ref = doc(db, COLL.VOTERS, v.id);
+      batch.set(ref, v);
+    }
+
+    await batch.commit();
+    console.log('Database Seeded.');
+  } catch (e) {
+    console.error("Database initialization failed:", e);
+  }
+};
